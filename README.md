@@ -1,5 +1,7 @@
 # The AI Lawyer
 
+<img src="cover-art/The_AI_Lawyer_Front_Cover.png" alt="The AI Lawyer book cover" width="280">
+
 **A Framework for Modern Self-Representation**, by Brendan Ngwa Nforbi.
 
 A nonfiction guide for pro se (self-represented) civil litigants on using a
