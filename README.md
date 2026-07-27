@@ -2,7 +2,7 @@
 
 <img src="cover-art/The_AI_Lawyer_Front_Cover.png" alt="The AI Lawyer book cover" width="280" align="right">
 
-**A Framework for Modern Self-Representation**, by Brendan Ngwa Nforbi.
+**AI-Powered Civil Rights Litigation for the Self-Represented**, by Brendan Ngwa Nforbi.
 
 A nonfiction guide for pro se (self-represented) civil litigants on using a
 multi-model AI workflow — research, drafting, discovery, depositions,
@@ -58,6 +58,14 @@ This edition went through a full editorial and production pass:
 - Removed hardcoded AI model version numbers (e.g. specific point releases)
   throughout, since those go stale fast — model/product names are kept,
   version numbers are not
+- Merged the author's own content revision (tightened subtitle and scope,
+  rewritten Key Takeaways, updated bio) back into the designed manuscript
+  after it round-tripped through Google Docs, which strips fonts, sizes,
+  colors, and section dividers down to plain-text defaults. The merge
+  restored the full typography system — title/chapter/heading hierarchy,
+  epigraphs, bulleted lists, monospace template blocks, and all 217 section
+  dividers — paragraph by paragraph, verified against the original text so
+  only formatting was reapplied, nothing was reworded in the process
 
 ## Distribution status
 
