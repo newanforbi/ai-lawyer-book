@@ -1,6 +1,6 @@
 # The AI Lawyer
 
-<img src="cover-art/The_AI_Lawyer_Front_Cover.png" alt="The AI Lawyer book cover" width="280">
+<img src="cover-art/The_AI_Lawyer_Front_Cover.png" alt="The AI Lawyer book cover" width="280" align="right">
 
 **A Framework for Modern Self-Representation**, by Brendan Ngwa Nforbi.
 
@@ -8,6 +8,8 @@ A nonfiction guide for pro se (self-represented) civil litigants on using a
 multi-model AI workflow — research, drafting, discovery, depositions,
 settlement — to build and run a case without a licensed attorney. The author
 is not an attorney; the book says so repeatedly and by design.
+
+<br clear="right">
 
 ## Repo structure
 
