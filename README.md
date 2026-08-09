@@ -90,27 +90,63 @@ exports/       Generated deliverables (PDF, EPUB), rendered from the
                manuscript. Never edited directly — always regenerated.
 cover-art/     Front and back cover art (PNG originals, JPG front cover
                for platforms that require it).
+tools/         The build. Scripts plus the vendored design fonts.
 ```
 
 ## Regenerating the exports
 
-The PDF and EPUB are both produced from `manuscript/The_AI_Lawyer_D2D_Ready.docx`
-via LibreOffice headless conversion:
-
 ```
-soffice --headless --convert-to pdf  --outdir exports manuscript/The_AI_Lawyer_D2D_Ready.docx
-soffice --headless --convert-to epub --outdir exports manuscript/The_AI_Lawyer_D2D_Ready.docx
+tools/build.sh              # retypeset the manuscript, then rebuild both exports
+tools/build.sh --exports    # rebuild the exports only, leaving the .docx alone
 ```
 
-The EPUB needs one additional pass after conversion: LibreOffice's exporter
-doesn't embed the custom fonts (EB Garamond, Montserrat, IBM Plex Mono) or
-fully satisfy the EPUB 3.2 spec on its own. Before shipping an EPUB, it must
-be post-processed to:
-1. Strip the `direction: ltr` CSS rule LibreOffice adds (disallowed in EPUB stylesheets)
-2. Add a `<title>` element to any XHTML file missing one
-3. Bundle the actual font files and add `@font-face` declarations + manifest entries
+Both deliverables come from `manuscript/The_AI_Lawyer_D2D_Ready.docx` via
+LibreOffice headless conversion, but neither export is shippable as LibreOffice
+leaves it. `build.sh` runs the whole chain:
 
-Validate with `epubcheck` before publishing — it should report 0 errors / 0 warnings.
+| Step | Script | Why |
+|---|---|---|
+| Install fonts | — | `word/fontTable.xml` is empty, so LibreOffice resolves fonts purely through fontconfig. Without the vendored faces in `tools/fonts/` it silently substitutes something else. |
+| Retypeset | `restyle_docx.py` | 11.5pt body on a 6×9 trim with mirrored margins. Guarded by a `TypographyScale` property so it can't double-apply. |
+| Export PDF | `soffice` | |
+| Fix trim | `fix_pdf_trim.py` | LibreOffice snaps a 9in page height to its 229mm paper format, exporting 649.16pt instead of 648. KDP checks trim exactly. |
+| Export EPUB | `soffice` | |
+| Fix EPUB | `fix_epub.py` | Embeds the fonts, adds `<title>`s, strips `direction: ltr`, and converts every absolute `pt` size to `em`. |
+| Split EPUB | `split_epub.py` | Promotes chapter labels and subheads to real `<h1>`/`<h2>`, splits the single 955KB document into one file per section, and regenerates `toc.xhtml` and `toc.ncx`. |
+
+The font-size one matters most. libepubgen stamps an absolute `pt` font-size on
+every run, and CSS `pt` is immune to inherited sizing — so the Kindle reader's
+"Aa" control had nothing to act on and readers could not resize the text at
+all. Body copy is now `1em`, exactly the reader's chosen size, with the rest of
+the hierarchy in proportion around it.
+
+The split matters nearly as much. LibreOffice emits the entire book as one
+955KB `section0001.xhtml` in which every line — chapter titles included — is an
+anonymous `<p class="paraN"><span class="spanN">`, with both navigation
+documents holding a single flat entry labelled "Section 1". The structure was
+implicit in the markup all along (empty `para1` paragraphs are the page-break
+markers, `para2` is the label, `para5` is a subhead), so `split_epub.py`
+recovers it: 32 `<h1>`, 167 `<h2>`, 33 spine items of ~60KB each, and a
+three-level table of contents with the 20 chapters nested under their parts.
+Rendering is unchanged — the headings keep their class names and the stylesheet
+gets a reset so browser defaults for `h1`–`h6` don't disturb the design.
+
+Verify with:
+
+```
+python3 tools/preview_epub.py --measure     # proves the Aa control scales the text
+python3 tools/preview_epub.py --shot /tmp/after.png --find 'is the code that governs'
+```
+
+`--measure` renders the book at several reader font sizes and fails loudly if
+the body text doesn't track them.
+
+`tools/vendor_fonts.py` re-fetches the design fonts. It needs network access and
+is deliberately not part of `build.sh` — the `.ttf` files are committed.
+
+Validate with `epubcheck` before publishing — it should report 0 errors / 0
+warnings. (Not installed in the build container; run it wherever you upload
+from.)
 
 ## Production notes
 
@@ -136,6 +172,23 @@ This edition went through a full editorial and production pass:
   epigraphs, bulleted lists, monospace template blocks, and all 217 section
   dividers — paragraph by paragraph, verified against the original text so
   only formatting was reapplied, nothing was reworded in the process
+- Retypeset for reading rather than for a word processor. The book had been
+  set at 13pt on a US Letter page — a letter-sized document, not a book. It is
+  now 11.5pt on a 6×9 trade trim with mirrored margins and 1.15 leading, 359
+  pages. In the EPUB, the absolute `pt` sizes that were overriding the Kindle
+  font-size control were converted to `em`
+- Replaced the EB Garamond bold face, which shipped as a broken 130-glyph
+  subset with no curly quotes, em dashes or accents. 133 glyph instances
+  inside bold runs were falling back to a substitute font mid-sentence — the
+  source of the stray DejaVuSerif subset embedded in the old PDF. Added the
+  bold-italic face, which was missing entirely and had been synthetically
+  slanted across 142 runs
+- Gave the EPUB real navigation. It had shipped as a single 955KB document
+  with no heading elements and a one-line table of contents reading
+  "Section 1"; it is now 33 files with 32 `<h1>` and 167 `<h2>`, and a
+  three-level TOC with the 20 chapters nested under their parts
+- Turned the build into scripts (`tools/`), replacing a manual post-export
+  checklist that had to be remembered and redone by hand every time
 
 ## Distribution status
 
@@ -144,11 +197,19 @@ This edition went through a full editorial and production pass:
 | Amazon KDP (Kindle) | Submitted, in review |
 | Draft2Digital (Apple Books, Kobo, B&N, Everand, library services, etc.) | Submitted, pending payment/tax verification |
 | Direct sale (Gumroad/Payhip) | Not yet started |
-| Print (KDP Print / IngramSpark) | Deferred — needs a wraparound cover with spine width calculated from final page count |
+| Print (KDP Print / IngramSpark) | Interior ready — 6×9 trim, 359 pages, mirrored margins (0.875in inside / 0.625in outside / 0.75in top and bottom). Still needs a wraparound cover; spine width can now be calculated from the 359-page count |
 
 No ISBN has been purchased. Ebook distribution uses each platform's free
 ISBN/ASIN; a self-owned ISBN would only be needed if/when print distribution
 expands beyond Amazon (IngramSpark requires a supplied ISBN; KDP Print does not).
+
+## Known gaps
+
+- **Print front matter uses arabic page numbers from page 1.** A conventional
+  interior would run roman numerals through the front matter and start arabic
+  at chapter one.
+- Two stray PNGs sit at the repo root (`3DC3290E-…`, `B11B1761-…`); the second
+  is a byte-identical duplicate of `cover-art/The_AI_Lawyer_Front_Cover.png`.
 
 ## Cost-benefit vs. a freelance/Fiverr-style production process
 
