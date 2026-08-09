@@ -112,12 +112,24 @@ leaves it. `build.sh` runs the whole chain:
 | Fix trim | `fix_pdf_trim.py` | LibreOffice snaps a 9in page height to its 229mm paper format, exporting 649.16pt instead of 648. KDP checks trim exactly. |
 | Export EPUB | `soffice` | |
 | Fix EPUB | `fix_epub.py` | Embeds the fonts, adds `<title>`s, strips `direction: ltr`, and converts every absolute `pt` size to `em`. |
+| Split EPUB | `split_epub.py` | Promotes chapter labels and subheads to real `<h1>`/`<h2>`, splits the single 955KB document into one file per section, and regenerates `toc.xhtml` and `toc.ncx`. |
 
-That last one matters most. libepubgen stamps an absolute `pt` font-size on
+The font-size one matters most. libepubgen stamps an absolute `pt` font-size on
 every run, and CSS `pt` is immune to inherited sizing — so the Kindle reader's
 "Aa" control had nothing to act on and readers could not resize the text at
 all. Body copy is now `1em`, exactly the reader's chosen size, with the rest of
 the hierarchy in proportion around it.
+
+The split matters nearly as much. LibreOffice emits the entire book as one
+955KB `section0001.xhtml` in which every line — chapter titles included — is an
+anonymous `<p class="paraN"><span class="spanN">`, with both navigation
+documents holding a single flat entry labelled "Section 1". The structure was
+implicit in the markup all along (empty `para1` paragraphs are the page-break
+markers, `para2` is the label, `para5` is a subhead), so `split_epub.py`
+recovers it: 32 `<h1>`, 167 `<h2>`, 33 spine items of ~60KB each, and a
+three-level table of contents with the 20 chapters nested under their parts.
+Rendering is unchanged — the headings keep their class names and the stylesheet
+gets a reset so browser defaults for `h1`–`h6` don't disturb the design.
 
 Verify with:
 
@@ -171,6 +183,10 @@ This edition went through a full editorial and production pass:
   source of the stray DejaVuSerif subset embedded in the old PDF. Added the
   bold-italic face, which was missing entirely and had been synthetically
   slanted across 142 runs
+- Gave the EPUB real navigation. It had shipped as a single 955KB document
+  with no heading elements and a one-line table of contents reading
+  "Section 1"; it is now 33 files with 32 `<h1>` and 167 `<h2>`, and a
+  three-level TOC with the 20 chapters nested under their parts
 - Turned the build into scripts (`tools/`), replacing a manual post-export
   checklist that had to be remembered and redone by hand every time
 
@@ -189,14 +205,6 @@ expands beyond Amazon (IngramSpark requires a supplied ISBN; KDP Print does not)
 
 ## Known gaps
 
-- **The EPUB has no real navigation.** LibreOffice emits the whole book as a
-  single 955KB `section0001.xhtml` with no `<h1>`/`<h2>` elements, and both
-  `toc.xhtml` and `toc.ncx` contain one flat entry labelled "Section 1". The
-  manuscript's 32 chapter titles and 167 subheads produce no nav entries at
-  all. Kindle's own heading detection papers over some of this, but the
-  navigation document does not reflect the book's structure. Fixing it means
-  splitting the section file and emitting real headings — a separate change to
-  the export path, not something post-processing can recover.
 - **Print front matter uses arabic page numbers from page 1.** A conventional
   interior would run roman numerals through the front matter and start arabic
   at chapter one.

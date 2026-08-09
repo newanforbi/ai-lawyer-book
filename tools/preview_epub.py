@@ -53,13 +53,29 @@ def chromium_path():
     sys.exit("no chromium found under /opt/pw-browsers")
 
 
-def extract(epub, dest):
+def extract(epub, dest, needle=None, index=None):
+    """Unpack, and pick the section worth looking at.
+
+    The book is split into one file per chapter, so there is no single document
+    to load. --section wins if given; then --find, which uses whichever section
+    contains the passage; otherwise the largest section, which is
+    representative body text rather than the title page.
+    """
     with zipfile.ZipFile(epub) as zf:
         zf.extractall(dest)
     sections = sorted(Path(dest).glob("OEBPS/sections/*.xhtml"))
     if not sections:
         sys.exit("no OEBPS/sections/*.xhtml in the epub")
-    return sections[0]
+    if index is not None:
+        if not 1 <= index <= len(sections):
+            sys.exit(f"--section must be 1..{len(sections)}")
+        return sections[index - 1]
+    if needle:
+        for s in sections:
+            if needle in s.read_text(encoding="utf-8"):
+                return s
+        sys.exit(f"no section contains {needle!r}")
+    return max(sections, key=lambda p: p.stat().st_size)
 
 
 MEASURE_JS = """
@@ -90,6 +106,8 @@ def main():
                     help="reader font size in px for --shot (default 16)")
     ap.add_argument("--find", default=None,
                     help="scroll to the first element containing this text")
+    ap.add_argument("--section", type=int, default=None,
+                    help="render this spine section by number instead of guessing")
     args = ap.parse_args()
 
     if not args.epub.exists():
@@ -99,8 +117,9 @@ def main():
 
     tmp = Path(tempfile.mkdtemp(prefix="epub-preview-"))
     try:
-        section = extract(args.epub, tmp)
+        section = extract(args.epub, tmp, args.find, args.section)
         url = section.as_uri()
+        print(f"[{section.name}]")
         with sync_playwright() as p:
             browser = p.chromium.launch(
                 executable_path=chromium_path(), args=["--no-sandbox"]

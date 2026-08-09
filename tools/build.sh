@@ -63,6 +63,7 @@ rm -f "$EPUB"
 soffice --headless -env:UserInstallation="$PROFILE" \
         --convert-to epub --outdir exports "$DOCX" 2>&1 | grep -v javaldx || true
 python3 tools/fix_epub.py "$EPUB"
+python3 tools/split_epub.py "$EPUB"
 
 step "Result"
 python3 - "$PDF" "$EPUB" <<'PY'
@@ -76,9 +77,13 @@ with pikepdf.open(pdf) as d:
 z = zipfile.ZipFile(epub)
 css = z.read("OEBPS/styles/stylesheet.css").decode()
 fonts = [n for n in z.namelist() if n.endswith(".ttf")]
+opf = z.read("OEBPS/content.opf").decode()
+ncx = z.read("OEBPS/toc.ncx").decode()
 print(f"  {epub}")
 print(f"      {len(fonts)} fonts embedded, "
       f"{css.count('em;')} relative sizes, {css.count('pt;')} absolute")
+print(f"      {opf.count('<itemref')} spine items, "
+      f"{ncx.count('<navPoint')} navigation entries")
 PY
 
 echo
