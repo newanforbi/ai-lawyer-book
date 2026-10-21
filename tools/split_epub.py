@@ -42,6 +42,14 @@ ROOT = Path(__file__).resolve().parent.parent
 EPUB = ROOT / "exports" / "The_AI_Lawyer_D2D_Ready.epub"
 
 TITLE = "The AI Lawyer"
+SUBTITLE = "A Framework for Modern Self-Representation"
+FULL_TITLE = f"{TITLE}: {SUBTITLE}"
+COVER_SRC = ROOT / "cover-art" / "The_AI_Lawyer_Front_Cover_1600x2400_upscaled.jpg"
+COVER_IMG = "OEBPS/images/cover.jpg"
+COVER_XHTML = "OEBPS/cover.xhtml"
+# The copyright/disclaimer block starts with this paragraph; it gets its own
+# file so it always begins on a new screen after the title page.
+COPYRIGHT_MARK = "Copyright \u00a9"
 SECTION_FMT = "OEBPS/sections/section{:04d}.xhtml"
 CSS_PATH = "OEBPS/styles/stylesheet.css"
 
@@ -93,9 +101,15 @@ def parse(body):
 
 
 def nav_label(label, title):
+    """'CHAPTER 1' + title -> 'Chapter 1: The Access-to-Justice Crisis'."""
+    words = label.split()
+    if words and words[0].isupper() and len(words[0]) > 1:
+        # Title-case the keyword; keep roman numerals / numbers / letters as-is.
+        words[0] = words[0].capitalize()
+        label = " ".join(words)
     if not title or title.upper() == label.upper():
         return label
-    return f"{label} — {title}"
+    return f"{label}: {title}"
 
 
 def build_sections(els):
@@ -128,8 +142,18 @@ def build_sections(els):
 
     # Everything before the first break is front matter and has no label.
     if sections and sections[0]["label"] is None:
-        sections[0]["label"] = "Front Matter"
+        sections[0]["label"] = "Title Page"
         sections[0]["title"] = None
+        front = sections[0]["els"]
+        cut = next(
+            (i for i, el in enumerate(front) if plain(el[3]).startswith(COPYRIGHT_MARK)),
+            None,
+        )
+        if cut:
+            sections[0]["els"] = front[:cut]
+            sections.insert(
+                1, {"els": front[cut:], "label": "Copyright", "title": None}
+            )
     return sections
 
 
@@ -165,11 +189,12 @@ def build_tree(sections):
             "label": nav_label(s["label"], s["title"]),
             "href": s["href"],
             "anchor": s["id"],
-            "children": [
-                {"label": h["text"], "href": f"{s['href']}#{h['id']}", "children": []}
-                for h in s["subheads"]
-            ],
+            # Parts and chapters only; subheads would make the TOC
+            # hundreds of entries long on a phone.
+            "children": [],
         }
+        if label == "COPYRIGHT":
+            continue  # follows the title page; not a TOC entry
         if label.startswith("PART "):
             current_part = node
             tree.append(node)
@@ -183,13 +208,14 @@ def build_tree(sections):
 
 def render_nav_ol(nodes, depth=1):
     pad = "  " * depth
+    cls = "toc-part" if depth == 1 else "toc-chapter"
     items = []
     for n in nodes:
         inner = f'<a href="{n["href"]}">{html.escape(n["label"])}</a>'
         if n["children"]:
             inner += "\n" + render_nav_ol(n["children"], depth + 1) + pad
-        items.append(f"{pad}<li>{inner}</li>")
-    return "<ol>\n" + "\n".join(items) + "\n" + "  " * (depth - 1) + "</ol>"
+        items.append(f'{pad}<li class="{cls}">{inner}</li>')
+    return f'<ol class="toc-list toc-depth{depth}">\n' + "\n".join(items) + "\n" + "  " * (depth - 1) + "</ol>"
 
 
 def render_toc_xhtml(tree):
@@ -199,11 +225,24 @@ def render_toc_xhtml(tree):
         'xmlns:epub="http://www.idpf.org/2007/ops"><head>'
         f"<title>{TITLE}</title>"
         '<link href="styles/stylesheet.css" rel="stylesheet" type="text/css"/>'
-        "</head><body>"
-        '<nav epub:type="toc" id="toc"><h1>Contents</h1>\n'
+        "</head><body class=\"toc-page\">"
+        '<nav epub:type="toc" id="toc"><h1 class="toc-title">Contents</h1>\n'
         + render_nav_ol(tree)
-        + "\n</nav></body></html>"
+        + "\n</nav>"
+        '<nav epub:type="landmarks" id="landmarks" hidden="hidden"><ol>'
+        '<li><a epub:type="cover" href="cover.xhtml">Cover</a></li>'
+        '<li><a epub:type="toc" href="toc.xhtml">Contents</a></li>'
+        f'<li><a epub:type="bodymatter" href="{tree_first_body(tree)}">Start</a></li>'
+        "</ol></nav></body></html>"
     )
+
+
+def tree_first_body(tree):
+    """First real content after the front matter (the Prelude / Part I)."""
+    for n in tree:
+        if n["label"] not in ("Title Page", "Copyright"):
+            return n["href"]
+    return tree[0]["href"]
 
 
 def tree_depth(nodes):
@@ -237,6 +276,100 @@ def render_ncx(tree, uid):
         f"<docTitle><text>{TITLE}</text></docTitle>"
         "<navMap>" + points(tree, 1) + "</navMap></ncx>"
     )
+
+
+TOC_CSS = """
+/* Table of contents (nav document) */
+body.toc-page { font-family: 'EB Garamond 12', Georgia, serif; }
+h1.toc-title {
+  font-family: 'Montserrat', sans-serif;
+  font-weight: bold;
+  font-size: 1.3em;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  text-align: center;
+  margin: 1.5em 0 1.2em 0;
+}
+ol.toc-list { list-style-type: none; margin: 0; padding: 0; }
+ol.toc-depth2 { margin: 0.3em 0 0.6em 0; padding: 0; }
+li.toc-part {
+  list-style-type: none;
+  margin: 0.9em 0 0 0;
+  font-family: 'Montserrat', sans-serif;
+  font-weight: bold;
+  font-size: 0.85em;
+  letter-spacing: 0.03em;
+}
+li.toc-chapter {
+  list-style-type: none;
+  margin: 0.35em 0 0 1.4em;
+  text-indent: -0.6em;
+  font-family: 'EB Garamond 12', Georgia, serif;
+  font-weight: normal;
+  font-size: 1.12em;
+  letter-spacing: 0;
+}
+nav#toc a, nav#landmarks a { color: inherit; text-decoration: none; }
+/* Cover */
+body.cover-page { margin: 0; padding: 0; text-align: center; }
+div.cover-wrap { margin: 0; padding: 0; height: 100%; text-align: center; }
+div.cover-wrap svg { width: 100%; height: 100%; }
+/* Copyright page: its own file; a break is requested for older readers too */
+body.copyright-page { page-break-before: always; }
+"""
+
+COVER_DOC = (
+    '<?xml version="1.0" encoding="UTF-8"?>\n'
+    '<html xmlns="http://www.w3.org/1999/xhtml" '
+    'xmlns:epub="http://www.idpf.org/2007/ops"><head><title>Cover</title>'
+    '<link href="styles/stylesheet.css" rel="stylesheet" type="text/css"/>'
+    '</head><body class="cover-page" epub:type="cover"><div class="cover-wrap">'
+    '<svg xmlns="http://www.w3.org/2000/svg" '
+    'xmlns:xlink="http://www.w3.org/1999/xlink" version="1.1" '
+    'width="100%" height="100%" viewBox="0 0 {w} {h}" '
+    'preserveAspectRatio="xMidYMid meet">'
+    '<image width="{w}" height="{h}" xlink:href="images/cover.jpg"/>'
+    "</svg></div></body></html>"
+)
+
+
+def add_cover_and_metadata(blob, opf, first_href):
+    """Embed the cover (EPUB3 cover-image + EPUB2 meta) and fix the title."""
+    from PIL import Image
+
+    with Image.open(COVER_SRC) as im:
+        w, h = im.size
+    blob[COVER_IMG] = COVER_SRC.read_bytes()
+    blob[COVER_XHTML] = COVER_DOC.format(w=w, h=h).encode("utf-8")
+
+    opf = re.sub(r"<dc:title[^>]*>.*?</dc:title>",
+                 f"<dc:title>{html.escape(FULL_TITLE)}</dc:title>", opf, flags=re.S)
+    opf = re.sub(r'<meta content="cover-image" name="cover"/>', "", opf)
+    opf = opf.replace("</metadata>",
+                      '<meta content="cover-image" name="cover"/></metadata>')
+    opf = re.sub(r'<item href="images/cover\.jpg"[^>]*/>', "", opf)
+    opf = re.sub(r'<item href="cover\.xhtml"[^>]*/>', "", opf)
+    opf = opf.replace(
+        "</manifest>",
+        '<item href="images/cover.jpg" id="cover-image" media-type="image/jpeg" '
+        'properties="cover-image"/>'
+        '<item href="cover.xhtml" id="cover" media-type="application/xhtml+xml" '
+        'properties="svg"/></manifest>',
+    )
+    opf = re.sub(r"(<spine[^>]*>)", r'\1<itemref idref="cover" linear="yes"/>', opf)
+    # Printed-style contents page right after the copyright page.
+    after = "sec1" if 'idref="sec1"' in opf else "sec0"
+    opf = opf.replace(f'<itemref idref="{after}"/>',
+                      f'<itemref idref="{after}"/><itemref idref="toc.xhtml"/>', 1)
+    # EPUB2 guide for older Kindle tooling
+    opf = re.sub(r"<guide>.*?</guide>", "", opf, flags=re.S)
+    opf = opf.replace(
+        "</package>",
+        '<guide><reference href="cover.xhtml" title="Cover" type="cover"/>'
+        '<reference href="toc.xhtml" title="Contents" type="toc"/>'
+        f'<reference href="{first_href}" title="Start" type="text"/></guide></package>',
+    )
+    return opf
 
 
 def rewrite_opf(opf, sections):
@@ -291,11 +424,15 @@ def main():
     for name in old_sections:
         del blob[name]
     for i, s in enumerate(sections):
-        doc = HEAD.format(title=TITLE) + s["html"] + TAIL
+        head = HEAD.format(title=TITLE)
+        if s["label"] == "Copyright":
+            head = head.replace('class="body0"', 'class="body0 copyright-page"')
+        doc = head + s["html"] + TAIL
         blob[SECTION_FMT.format(i + 1)] = doc.encode("utf-8")
 
     opf_name = next(n for n in blob if n.endswith(".opf"))
     opf, uid = rewrite_opf(blob[opf_name].decode("utf-8"), sections)
+    opf = add_cover_and_metadata(blob, opf, tree_first_body(tree))
     blob[opf_name] = opf.encode("utf-8")
 
     blob["OEBPS/toc.xhtml"] = render_toc_xhtml(tree).encode("utf-8")
@@ -306,7 +443,9 @@ def main():
         anchor = css.rfind("@font-face")
         cut = css.find("\n", anchor) + 1 if anchor != -1 else 0
         css = css[:cut] + HEADING_RESET + css[cut:]
-        blob[CSS_PATH] = css.encode("utf-8")
+    if "body.toc-page" not in css:
+        css += TOC_CSS
+    blob[CSS_PATH] = css.encode("utf-8")
 
     order = ["mimetype"] + [n for n in blob if n != "mimetype"]
     tmp = args.epub.with_suffix(".epub.tmp")

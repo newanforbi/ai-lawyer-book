@@ -2,7 +2,7 @@
 
 <img src="cover-art/The_AI_Lawyer_Front_Cover.png" alt="The AI Lawyer book cover" width="280" align="right">
 
-**AI-Powered Civil Rights Litigation for the Self-Represented**, by Brendan Ngwa Nforbi.
+**A Framework for Modern Self-Representation**, by Brendan Ngwa Nforbi.
 
 A nonfiction guide for pro se (self-represented) civil litigants on using a
 multi-model AI workflow — research, drafting, discovery, depositions,
@@ -197,7 +197,7 @@ This edition went through a full editorial and production pass:
 | Amazon KDP (Kindle) | Submitted, in review |
 | Draft2Digital (Apple Books, Kobo, B&N, Everand, library services, etc.) | Submitted, pending payment/tax verification |
 | Direct sale (Gumroad/Payhip) | Not yet started |
-| Print (KDP Print / IngramSpark) | Interior ready — 6×9 trim, 359 pages, mirrored margins (0.875in inside / 0.625in outside / 0.75in top and bottom). Still needs a wraparound cover; spine width can now be calculated from the 359-page count |
+| Print (KDP Print / IngramSpark) | Interior ready — 6×9 trim, 360 pages, mirrored margins (0.875in inside / 0.625in outside / 0.75in top and bottom). Still needs a wraparound cover; spine width can now be calculated from the 360-page count |
 
 No ISBN has been purchased. Ebook distribution uses each platform's free
 ISBN/ASIN; a self-owned ISBN would only be needed if/when print distribution
@@ -249,3 +249,10 @@ freelancers. Worth being honest about where that helped and where it didn't:
 surface area; a human professional pass — especially a legal-practice read
 on the substantive advice — is still a reasonable step before betting fully
 on this at wide print scale.
+
+### Kindle formatting pass (fix/kindle-formatting)
+
+- Subtitle unified to *A Framework for Modern Self-Representation* (manuscript title page, docx core properties, EPUB `dc:title`, README).
+- EPUB cover is embedded from `cover-art/The_AI_Lawyer_Front_Cover_1600x2400_upscaled.jpg` (`properties="cover-image"`, `<meta name="cover">`, `cover.xhtml`, guide/landmarks). That file is an **AI upscale** (Real-ESRGAN x4plus, then Lanczos down to 1600x2400) of the 1024x1536 original, not new artwork; the original PNG is untouched. Replace it with a native 1600x2560-class export if one becomes available.
+- Contents page is styled by the book stylesheet, shows Parts and Chapters only ("Chapter 1: The Access-to-Justice Crisis"), and sits in the spine after the copyright page.
+- Copyright/disclaimer is its own file (and has a page break before it in the manuscript, so the PDF gets one too).
